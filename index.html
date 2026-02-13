@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fridge Inventory System</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
+    
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .container { background: white; padding: 2.5rem; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); width: 100%; max-width: 900px; }
+        
+        .auth-box { max-width: 350px; margin: 0 auto; text-align: center; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background-color: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; margin-top: 15px; font-weight: 600; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #a0cfff; }
+        .secondary { background-color: #6c757d; margin-top: 10px; }
+        .error { color: #dc3545; display: none; margin-top: 10px; background: #ffe6e6; padding: 8px; border-radius: 4px; }
+        .success { color: #28a745; display: none; margin-top: 10px; background: #e6ffed; padding: 8px; border-radius: 4px; }
+        
+        #inventory-section { display: none; }
+        .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .spinner { display: none; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s infinite; margin: 0 auto; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .toggle-link { color: #007bff; cursor: pointer; display: block; margin-top: 15px; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        
+        <div id="login-view" class="auth-box">
+            <h2>Smart Refrigerator Assistant (Jarvis) Inventory Login</h2>
+            <input type="text" id="login-user" placeholder="Username" />
+            <input type="password" id="login-pass" placeholder="Password" />
+            <button onclick="handleAuth('login')" id="btn-login"><span class="btn-text">Login</span><div class="spinner"></div></button>
+            <p id="login-msg" class="error"></p>
+            <div style="margin-top:20px; display:flex; justify-content:space-between;">
+                <span class="toggle-link" onclick="prepareChangePass()" style="margin:0">Change Password?</span>
+                <span class="toggle-link" onclick="showView('signup-view')" style="margin:0">Sign Up</span>
+            </div>
+        </div>
+
+        <div id="signup-view" class="auth-box" style="display:none;">
+            <h2>Create Account</h2>
+            <input type="text" id="signup-user" placeholder="Choose Username" />
+            <input type="password" id="signup-pass" placeholder="Choose Password" />
+            <button onclick="handleAuth('signup')" id="btn-signup"><span class="btn-text">Sign Up</span><div class="spinner"></div></button>
+            <button class="secondary" onclick="showView('login-view')">Back</button>
+            <p id="signup-msg" class="error"></p>
+        </div>
+
+        <div id="change-pass-view" class="auth-box" style="display:none;">
+            <h2>Change Password</h2>
+            <input type="text" id="cp-user" placeholder="Username" />
+            <input type="password" id="cp-old" placeholder="Old Password" />
+            <input type="password" id="cp-new" placeholder="New Password" />
+            <button onclick="handleAuth('change_password')" id="btn-cp"><span class="btn-text">Update</span><div class="spinner"></div></button>
+            <button class="secondary" onclick="showView('login-view')">Cancel</button>
+            <p id="cp-msg" class="error"></p>
+        </div>
+
+        <div id="inventory-section">
+            <div class="header-row">
+                <h1 style="margin:0;">Fridge Inventory</h1>
+                <button style="width:auto; padding:8px 15px; background-color:#dc3545; margin:0;" onclick="logout()">Logout</button>
+            </div>
+            <table id="inventory" class="display" style="width:100%">
+                <thead>
+                    <tr><th>Item</th><th>Qty</th><th>Unit</th><th>Category</th><th>Expiry</th><th>Status</th></tr>
+                </thead>
+            </table>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.30.1/moment.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+
+    <script>
+        // ----------------------------------------------------
+    
+        const API_URL = 'https://script.google.com/macros/s/AKfycbwG462ao0VUGfTOuxNcnYm-BDuNorNLtjFS-b5FY6jo4vzkdFvNv_2CRipYBoYp5_hhvw/exec'; 
+        // ----------------------------------------------------
+
+        let currentUser = null;
+        let currentPass = null;
+        let tableInstance = null;
+
+        function showView(viewId) {
+            $('.auth-box, #inventory-section').hide();
+            $('#' + viewId).show();
+            $('.error, .success').hide().text('');
+            $('input').val('');
+        }
+
+        function handleAuth(action) {
+            let payload = { action: action };
+            let msgBox, btn;
+
+            if (action === 'login') {
+                payload.username = $('#login-user').val();
+                payload.password = $('#login-pass').val();
+                msgBox = $('#login-msg'); btn = $('#btn-login');
+            } else if (action === 'signup') {
+                payload.username = $('#signup-user').val();
+                payload.password = $('#signup-pass').val();
+                msgBox = $('#signup-msg'); btn = $('#btn-signup');
+            } else if (action === 'change_password') {
+                payload.username = $('#cp-user').val();
+                payload.old_password = $('#cp-old').val();
+                payload.new_password = $('#cp-new').val();
+                msgBox = $('#cp-msg'); btn = $('#btn-cp');
+            }
+
+            msgBox.hide(); 
+            btn.prop('disabled', true).find('.btn-text').hide().end().find('.spinner').show();
+
+            $.ajax({
+                url: API_URL,
+                method: "POST",
+                data: JSON.stringify(payload),
+                contentType: "text/plain", // Important for GAS
+                success: function(response) {
+                    btn.prop('disabled', false).find('.btn-text').show().end().find('.spinner').hide();
+                    
+                    // --- THE FIX: Smart JSON Parsing ---
+                    let res;
+                    try {
+                        if (typeof response === "object") {
+                            res = response; // jQuery already parsed it
+                        } else {
+                            res = JSON.parse(response); // Parse string manually
+                        }
+                    } catch (e) {
+                        console.error("Raw response:", response);
+                        msgBox.addClass('error').text("Server returned invalid data. Check Console.").show();
+                        return;
+                    }
+                    // -----------------------------------
+
+                    if (res.status === 'success') {
+                        if (action === 'login') {
+                            currentUser = payload.username;
+                            currentPass = payload.password;
+                            $('.auth-box').hide();
+                            $('#inventory-section').show();
+                            loadTable();
+                        } else if (action === 'signup') {
+                            alert("Account created! Logging you in...");
+                            currentUser = payload.username;
+                            currentPass = payload.password;
+                            $('.auth-box').hide();
+                            $('#inventory-section').show();
+                            loadTable();
+                        } else if (action === 'change_password') {
+                            alert("Password changed! Please login again."); 
+                            logout();
+                        }
+                    } else {
+                        msgBox.addClass('error').text(res.message).show();
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error("AJAX Error:", error);
+                    btn.prop('disabled', false).find('.btn-text').show().end().find('.spinner').hide();
+                    msgBox.addClass('error').text("Connection failed. See console for details.").show();
+                }
+            });
+        }
+
+        function loadTable() {
+            if ($.fn.DataTable.isDataTable('#inventory')) {
+                $('#inventory').DataTable().ajax.reload();
+                return;
+            } 
+
+            tableInstance = $('#inventory').DataTable({
+                processing: true,
+                ajax: function (data, callback, settings) {
+                    $.ajax({
+                        url: API_URL,
+                        method: 'POST',
+                        contentType: "text/plain", 
+                        data: JSON.stringify({
+                            action: "get_inventory",
+                            username: currentUser,
+                            password: currentPass
+                        }),
+                        success: function (response) {
+                            let json;
+                            // Same smart parsing fix for Table
+                            if (typeof response === "object") {
+                                json = response;
+                            } else {
+                                try {
+                                    json = JSON.parse(response);
+                                } catch(e) {
+                                    console.error("Table JSON Parse Error", response);
+                                    json = { data: [] };
+                                }
+                            }
+                            
+                            if (json.error) {
+                                alert(json.error);
+                                logout();
+                            } else {
+                                callback({ data: json.data || [] });
+                            }
+                        },
+                        error: function() {
+                            alert("Failed to load inventory.");
+                            callback({ data: [] });
+                        }
+                    });
+                },
+                columns: [
+                    { data: 'item_name', defaultContent: "-" },
+                    { data: 'qty', defaultContent: "0" },
+                    { data: 'unit', defaultContent: "-" },
+                    { data: 'category', defaultContent: "-" },
+                    { 
+                        data: 'expiry', 
+                        defaultContent: "-",
+                        render: function (data) {
+                            if (!data || data === "N/A" || data === "-") return "N/A";
+                            return moment(data).format('YYYY-MM-DD');
+                        }
+                    },
+                    { data: 'status', defaultContent: "--" },
+                ]
+            });
+        }
+
+        function prepareChangePass() {
+            if(currentUser) $('#cp-user').val(currentUser);
+            showView('change-pass-view');
+        }
+
+        function logout() {
+            currentUser = null; currentPass = null;
+            location.reload(); 
+        }
+    </script>
+</body>
+</html>
