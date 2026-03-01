@@ -1,0 +1,45 @@
+{
+  "apple": {
+    "item_name": "apple",
+    "unit": "pieces",
+    "category": "fruits",
+    "batches": [
+      {
+        "qty": 2,
+        "expiry": "2026/02/20",
+        "status": "Good to Eat"
+      },
+      {
+        "qty": 21,
+        "expiry": "2026/02/21",
+        "status": "Good to Eat"
+      }
+
+    ]
+  },
+  "banana": {
+    "item_name": "banana",
+    "unit": "pieces",
+    "category": "fruits",
+    "batches": [
+      {
+        "qty": 2,
+        "expiry": "2026/02/20",
+        "status": "Good to Eat"
+      }
+    ]
+  },
+  "strawberry": {
+    "item_name": "strawberry",
+    "unit": "pieces",
+    "category": "fruits",
+    "batches": [
+      {
+        "qty": 8,
+        "expiry": "2026/02/23",
+        "status": "Good to Eat"
+      }
+    ]
+  }
+
+}
